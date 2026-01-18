@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta http-equiv="Content-Security-Policy"
+content="default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; media-src * blob:;">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TV Online Universal</title>
+
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+
+<style>
+body{
+  margin:0;
+  font-family:Arial,Helvetica,sans-serif;
+  background:#0b0b0b;
+  color:#fff;
+}
+header{
+  background:#111;
+  padding:12px;
+  font-size:20px;
+}
+.controls{
+  display:flex;
+  gap:6px;
+  padding:10px;
+  background:#111;
+}
+.controls input[type="text"]{
+  flex:1;
+  padding:8px;
+  border-radius:6px;
+  border:none;
+}
+.controls button{
+  padding:8px 12px;
+  border:none;
+  border-radius:6px;
+  background:#e50914;
+  color:#fff;
+}
+video{
+  width:100%;
+  max-height:240px;
+  background:#000;
+}
+.grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(110px,1fr));
+  gap:10px;
+  padding:10px;
+}
+.card{
+  background:#151515;
+  border-radius:12px;
+  padding:10px;
+  text-align:center;
+  cursor:pointer;
+}
+.card img{
+  width:60px;
+  height:60px;
+  object-fit:contain;
+  margin-bottom:6px;
+}
+.card:hover{
+  background:#222;
+}
+</style>
+</head>
+
+<body>
+
+<header>📺 TV Online Universal</header>
+
+<!-- OPSI 1 & 2 -->
+<div class="controls">
+  <input type="file" accept=".m3u,.m3u8" onchange="loadFile(this)">
+  <input type="text" id="m3uUrl" placeholder="Tempel link M3U di sini">
+  <button onclick="loadUrl()">Load</button>
+</div>
+
+<video id="player" controls playsinline></video>
+
+<div class="grid" id="channels"></div>
+
+<script>
+const video = document.getElementById("player");
+const channelBox = document.getElementById("channels");
+let hls;
+
+function playStream(url){
+  if(hls){ hls.destroy(); }
+
+  if(Hls.isSupported()){
+    hls = new Hls();
+    hls.loadSource(url);
+    hls.attachMedia(video);
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      video.muted = true;
+      video.play().catch(()=>{});
+    });
+  }else{
+    video.src = url;
+    video.play().catch(()=>{});
+  }
+}
+
+// ===== M3U PARSER =====
+function parseM3U(text){
+  channelBox.innerHTML="";
+  const lines = text.split("\n");
+  let name="", logo="";
+  for(let i=0;i<lines.length;i++){
+    if(lines[i].startsWith("#EXTINF")){
+      name = lines[i].split(",").pop().trim();
+      const logoMatch = lines[i].match(/tvg-logo="(.*?)"/);
+      logo = logoMatch ? logoMatch[1] : "";
+    }else if(lines[i].startsWith("http")){
+      addChannel(name, logo, lines[i].trim());
+    }
+  }
+}
+
+function addChannel(name, logo, url){
+  const card = document.createElement("div");
+  card.className = "card";
+  card.innerHTML = `
+    <img src="${logo || 'https://via.placeholder.com/60'}">
+    <div>${name}</div>
+  `;
+  card.onclick = ()=> playStream(url);
+  channelBox.appendChild(card);
+}
+
+// ===== OPSI 1: UPLOAD FILE =====
+function loadFile(input){
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = e => parseM3U(e.target.result);
+  reader.readAsText(file);
+}
+
+// ===== OPSI 2: LINK URL =====
+function loadUrl(){
+  const url = document.getElementById("m3uUrl").value.trim();
+  if(!url) return alert("Masukkan link M3U");
+  fetch(url)
+    .then(r=>r.text())
+    .then(parseM3U)
+    .catch(()=>alert("Gagal load M3U"));
+}
+</script>
+
+</body>
+</html>
